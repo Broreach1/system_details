@@ -13,15 +13,21 @@ from flask import Flask, render_template, request, redirect, url_for, flash, jso
 # Config
 # -----------------------------
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "system_details.db"
+
+# ✅ For Render: set env DB_PATH=/var/data/system_details.db + attach disk at /var/data
+DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "system_details.db")))
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_EXCHANGE_RATE = int(os.getenv("EXCHANGE_RATE", "4100"))
 
 KHR_DENOMS = [100, 200, 500, 1000, 5000, 10000, 20000, 30000, 50000, 100000]
 USD_DENOMS = [1, 5, 10, 20, 50, 100]
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+TELEGRAM_BOT_TOKEN = (os.getenv("TELEGRAM_BOT_TOKEN", "") or "").strip()
+TELEGRAM_CHAT_ID = (os.getenv("TELEGRAM_CHAT_ID", "") or "").strip()
+
+# Telegram message max ~4096, keep buffer
+MAX_TELEGRAM_LEN = 3900
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "change-me")
@@ -121,21 +127,58 @@ def to_float(v, default=0.0):
         return default
 
 
+def _clean_chat_id(chat_id: str):
+    """
+    Telegram chat_id can be:
+    - int (123, -100xxx)
+    - @channelusername
+    We'll return int if it's numeric, else string.
+    """
+    s = (chat_id or "").strip()
+    if not s:
+        return ""
+    # numeric?
+    if s.lstrip("-").isdigit():
+        try:
+            return int(s)
+        except:
+            return s
+    return s
+
+
+def _safe_telegram_text(text: str) -> str:
+    t = (text or "").strip()
+    if len(t) <= MAX_TELEGRAM_LEN:
+        return t
+    return t[:MAX_TELEGRAM_LEN] + "\n...(កាត់ខ្លី)"
+
+
 def send_telegram_message(text: str) -> bool:
-    """Send plain text to Telegram. Returns True if success."""
+    """Send plain text to Telegram. Logs errors to Render logs."""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print("Telegram missing env:", {
+            "has_token": bool(TELEGRAM_BOT_TOKEN),
+            "has_chat_id": bool(TELEGRAM_CHAT_ID)
+        })
         return False
 
+    chat_id = _clean_chat_id(TELEGRAM_CHAT_ID)
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": text,
+        "chat_id": chat_id,
+        "text": _safe_telegram_text(text),
         "disable_web_page_preview": True,
     }
+
     try:
-        r = requests.post(url, json=payload, timeout=15)
-        return r.status_code == 200
-    except Exception:
+        r = requests.post(url, json=payload, timeout=20)
+        if r.status_code != 200:
+            # ✅ show real reason in Render logs
+            print("Telegram send failed:", r.status_code, r.text)
+            return False
+        return True
+    except Exception as e:
+        print("Telegram exception:", repr(e))
         return False
 
 
@@ -222,11 +265,17 @@ def api_calc():
     return jsonify(calc_totals(payload))
 
 
+@app.get("/test_telegram")
+def test_telegram():
+    ok = send_telegram_message("✅ Telegram test from System Details (Render)")
+    return ("OK" if ok else "FAIL"), (200 if ok else 500)
+
+
 @app.post("/save")
 def save():
     staff = request.form.get("staff", "").strip()
     shift = request.form.get("shift", "").strip()
-    note = request.form.get("note", "").strip()
+    note = (request.form.get("note", "") or "").strip()
 
     payload = {
         "exchange_rate": request.form.get("exchange_rate"),
@@ -301,37 +350,42 @@ def save():
         khr_block = "\n".join(khr_lines) if khr_lines else "មិនមាន"
         usd_block = "\n".join(usd_lines) if usd_lines else "មិនមាន"
 
+        # Note can be long -> cut to safe size
+        safe_note = note
+        if len(safe_note) > 1200:
+            safe_note = safe_note[:1200] + " ...(កាត់ខ្លី)"
+
         msg = (
             "📌 របាយការណ៍ព័ត៌មានលម្អិត\n"
-            f"🆔 វេន: #{report_id}\n"
+            f"🆔 Report ID: #{report_id}\n"
             f"🕒 ម៉ោង: {created_at}\n"
             f"👤 បុគ្គលិក: {staff or '-'}\n"
             f"🧾 វេន: {shift or '-'}\n"
-            f" អត្រាប្ដូរប្រាក់: {result['exchange_rate']:,} រៀល/1$\n\n"
-            " ចំនួនប្រាក់ (រៀល):\n"
+            f"💱 អត្រាប្ដូរប្រាក់: {result['exchange_rate']:,} រៀល/1$\n\n"
+            "💰 ចំនួនប្រាក់ (រៀល):\n"
             f"{khr_block}\n\n"
-            " ចំនួនប្រាក់ (ដុល្លារ):\n"
+            "💵 ចំនួនប្រាក់ (ដុល្លារ):\n"
             f"{usd_block}\n\n"
-            f" ប្រាក់សាច់ (USD): ${result['cash_usd']:.2f}\n"
-            f" ប្រាក់សាច់ (KHR): ៛{result['cash_khr']:,}\n"
-            f" វីសា (USD): ${result['visa_usd']:.2f}\n"
-            f" ABA (KHR): ៛{result['aba_khr']:,}\n"
-            f" AC (USD): ${result['ac_usd']:.2f}\n"
-            f" AC (KHR): ៛{result['ac_khr']:,}\n"
-            f" ចំណាយ (USD): ${result['expense_usd']:.2f}\n"
-            f" ចំណាយ (KHR): ៛{result['expense_khr']:,}\n\n"
-            f" សរុបសុទ្ធ (KHR): ៛{result['total_khr']:,}\n"
-            f" សរុបសុទ្ធ (USD): ${result['total_usd']:.4f}\n"
-            f" លុយពីPOS (USD): ${result['pos_usd']:.2f}\n"
-            f" លើសឬបាត់លុយ (USD): ${result['diff_usd']:.4f}\n"
+            f"💵 ប្រាក់សាច់ (USD): ${result['cash_usd']:.2f}\n"
+            f"💰 ប្រាក់សាច់ (KHR): ៛{result['cash_khr']:,}\n"
+            f"💳 វីសា (USD): ${result['visa_usd']:.2f}\n"
+            f"🏦 ABA (KHR): ៛{result['aba_khr']:,}\n"
+            f"💼 AC (USD): ${result['ac_usd']:.2f}\n"
+            f"💼 AC (KHR): ៛{result['ac_khr']:,}\n"
+            f"🧾 ចំណាយ (USD): ${result['expense_usd']:.2f}\n"
+            f"🧾 ចំណាយ (KHR): ៛{result['expense_khr']:,}\n\n"
+            f"✅ សរុបសុទ្ធ (KHR): ៛{result['total_khr']:,}\n"
+            f"✅ សរុបសុទ្ធ (USD): ${result['total_usd']:.4f}\n"
+            f"📊 លុយពីPOS (USD): ${result['pos_usd']:.2f}\n"
+            f"➖ លើសឬបាត់លុយ (USD): ${result['diff_usd']:.4f}\n"
         )
 
-        if note:
-            msg += f"\n📝 ចំណាំ: {note}"
+        if safe_note:
+            msg += f"\n📝 ចំណាំ:\n{safe_note}"
 
         ok = send_telegram_message(msg)
         if not ok:
-            flash("Saved ✅ but Telegram failed (check TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID).")
+            flash("Saved ✅ but Telegram failed. Check Render logs for exact Telegram error.")
 
     flash(f"Saved report #{report_id} ✅")
     return redirect(url_for("reports"))
@@ -391,4 +445,3 @@ def export_csv():
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
-
