@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="km">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>System Details</title>
+  <style>
+    body { font-family: Arial, "Noto Sans Khmer", sans-serif; background:#f6f7fb; margin:0; padding:20px; }
+    .wrap { max-width: 1100px; margin: 0 auto; }
+    .card { background:#fff; border:1px solid #e6e7ee; border-radius:14px; padding:16px; margin-bottom:14px; }
+    h1 { margin:0 0 10px; }
+    h3 { margin:0 0 10px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border:1px solid #e6e7ee; padding:8px; text-align:right; }
+    th { background:#fafbff; text-align:center; }
+    td:first-child, th:first-child { text-align:center; width:120px; }
+    input[type="number"], input[type="text"] {
+      width:100%; padding:8px; border:1px solid #d8d9e2; border-radius:10px; box-sizing:border-box;
+    }
+    label { display:block; margin-bottom:6px; font-weight:700; }
+    .row { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+    .row2 { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .totals { display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:10px; }
+    .pill { background:#fff7cc; border:1px solid #f2de7b; border-radius:12px; padding:10px; }
+    .pill b { display:block; margin-bottom:6px; }
+    .btns { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    button { padding:10px 14px; border-radius:12px; border:0; cursor:pointer; }
+    .primary { background:#1a73e8; color:#fff; }
+    .ghost { background:#eef2ff; color:#111; }
+    a.ghost { text-decoration:none; display:inline-block; padding:10px 14px; border-radius:12px; }
+    small { color:#666; }
+    .flash { padding:10px 12px; border-radius:12px; background:#e8fff0; border:1px solid #b9f0cc; margin-bottom:12px; }
+
+     textarea{
+    width:100%;
+    padding:8px;
+    border:1px solid #d8d9e2;
+    border-radius:10px;
+    box-sizing:border-box;
+    resize: vertical;     /* user can drag bigger */
+    min-height: 90px;     /* show long note */
+    font-family: inherit; /* Khmer font same */
+  }
+
+    
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="flash">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <div class="card">
+    <h1>System Details</h1>
+
+    <div class="row">
+      <div>
+        <label>Staff</label>
+        <input name="staff" form="saveForm" type="text" placeholder="ឈ្មោះបុគ្គលិក / Staff name">
+      </div>
+      <div>
+        <label>Shift</label>
+        <input name="shift" form="saveForm" type="text" placeholder="Morning / Evening">
+      </div>
+      <div>
+        <label>Exchange Rate (KHR per 1 USD)</label>
+        <input id="exchange_rate" name="exchange_rate" form="saveForm" type="number" value="{{ default_rate }}">
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Cash Count (KHR)</h3>
+      <table>
+        <thead>
+          <tr><th>Denom</th><th>Qty</th><th>Subtotal (KHR)</th></tr>
+        </thead>
+        <tbody>
+          {% for d in khr_denoms %}
+          <tr>
+            <td>{{ d }}</td>
+            <td>
+              <input type="number" min="0" value="0"
+                     id="khr_qty_{{d}}" name="khr_qty_{{d}}" form="saveForm">
+            </td>
+            <td id="khr_sub_{{d}}">0</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Cash Count (USD)</h3>
+      <table>
+        <thead>
+          <tr><th>Denom</th><th>Qty</th><th>Subtotal ($)</th></tr>
+        </thead>
+        <tbody>
+          {% for d in usd_denoms %}
+          <tr>
+            <td>{{ d }}</td>
+            <td>
+              <input type="number" min="0" value="0"
+                     id="usd_qty_{{d}}" name="usd_qty_{{d}}" form="saveForm">
+            </td>
+            <td id="usd_sub_{{d}}">0</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Other Payments</h3>
+
+    <div class="row2">
+      <div>
+        <label>Visa ($)</label>
+        <input id="visa_usd" name="visa_usd" form="saveForm" type="number" step="0.01" value="0">
+      </div>
+
+      <div>
+        <label>ABA (KHR)</label>
+        <input id="aba_khr" name="aba_khr" form="saveForm" type="number" step="1" value="0">
+      </div>
+
+      <div>
+        <label>AC ($)</label>
+        <input id="ac_usd" name="ac_usd" form="saveForm" type="number" step="0.01" value="0">
+      </div>
+
+      <div>
+        <label>AC (KHR)</label>
+        <input id="ac_khr" name="ac_khr" form="saveForm" type="number" step="1" value="0">
+      </div>
+
+      <div>
+        <label>POS Total ($) (optional)</label>
+        <input id="pos_usd" name="pos_usd" form="saveForm" type="number" step="0.01" value="0">
+        <small>Compare total vs POS (difference).</small>
+      </div>
+
+      <div>
+        <label>Note</label>
+        <textarea id="note" name="note" form="saveForm" rows="4" placeholder="Note..."></textarea>
+      </div>
+
+      <!-- ✅ Expense -->
+      <div>
+        <label>ចំណាយ (USD)</label>
+        <input id="expense_usd" name="expense_usd" form="saveForm" type="number" step="0.01" value="0">
+      </div>
+
+      <div>
+        <label>ចំណាយ (KHR)</label>
+        <input id="expense_khr" name="expense_khr" form="saveForm" type="number" step="1" value="0">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Totals (Net)</h3>
+
+    <div class="totals">
+      <div class="pill"><b>Cash USD</b><div id="out_cash_usd">0</div></div>
+      <div class="pill"><b>Cash KHR</b><div id="out_cash_khr">0</div></div>
+      <div class="pill"><b>Total KHR (Net)</b><div id="out_total_khr">0</div></div>
+      <div class="pill"><b>Total USD (Net)</b><div id="out_total_usd">0</div></div>
+    </div>
+
+    <div style="margin-top:10px" class="pill">
+      <b>Difference (TotalUSD - POS)</b>
+      <div id="out_diff_usd">0</div>
+    </div>
+
+    <div class="btns" style="margin-top:12px">
+      <button class="ghost" type="button" onclick="recalc()">Recalculate</button>
+
+      <form id="saveForm" method="post" action="/save" style="display:inline;">
+        <label style="display:flex;gap:8px;align-items:center;font-weight:600;margin:0;">
+          <input type="checkbox" name="send_telegram" value="1" checked>
+          Send to Telegram
+        </label>
+
+        <button class="primary" type="submit">Save Report</button>
+      </form>
+
+      <a href="/reports" class="ghost">View Reports</a>
+      <a href="/export.csv" class="ghost">Export CSV</a>
+    </div>
+  </div>
+
+</div>
+
+<script id="khrDenoms" type="application/json">{{ khr_denoms | tojson | safe }}</script>
+<script id="usdDenoms" type="application/json">{{ usd_denoms | tojson | safe }}</script>
+
+<script>
+  const KHR_DENOMS = JSON.parse(document.getElementById("khrDenoms").textContent);
+  const USD_DENOMS = JSON.parse(document.getElementById("usdDenoms").textContent);
+
+  function num(v){ return Number(v || 0); }
+  function int(v){ return Math.floor(num(v)); }
+
+  async function recalc(){
+    const payload = {
+      exchange_rate: num(document.getElementById("exchange_rate").value),
+      visa_usd: num(document.getElementById("visa_usd").value),
+      aba_khr: int(document.getElementById("aba_khr").value),
+      ac_usd: num(document.getElementById("ac_usd").value),
+      ac_khr: int(document.getElementById("ac_khr").value),
+      pos_usd: num(document.getElementById("pos_usd").value),
+      expense_usd: num(document.getElementById("expense_usd").value),
+      expense_khr: int(document.getElementById("expense_khr").value),
+      khr_qty: {},
+      usd_qty: {}
+    };
+
+    for (const d of KHR_DENOMS){
+      const qty = int(document.getElementById(`khr_qty_${d}`).value);
+      payload.khr_qty[String(d)] = qty;
+      document.getElementById(`khr_sub_${d}`).textContent = (d * qty).toLocaleString();
+    }
+
+    for (const d of USD_DENOMS){
+      const qty = int(document.getElementById(`usd_qty_${d}`).value);
+      payload.usd_qty[String(d)] = qty;
+      document.getElementById(`usd_sub_${d}`).textContent = (d * qty).toFixed(2);
+    }
+
+    const res = await fetch("/api/calc", {
+      method:"POST",
+      headers:{ "Content-Type":"application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    const out = await res.json();
+
+    document.getElementById("out_cash_usd").textContent = out.cash_usd.toFixed(2);
+    document.getElementById("out_cash_khr").textContent = out.cash_khr.toLocaleString();
+    document.getElementById("out_total_khr").textContent = out.total_khr.toLocaleString();
+    document.getElementById("out_total_usd").textContent = out.total_usd.toFixed(4);
+    document.getElementById("out_diff_usd").textContent = out.diff_usd.toFixed(4);
+  }
+
+  function bindRecalc(){
+    const ids = ["exchange_rate","visa_usd","aba_khr","ac_usd","ac_khr","pos_usd","expense_usd","expense_khr"];
+    for (const id of ids){
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", recalc);
+    }
+    for (const d of KHR_DENOMS){
+      const el = document.getElementById(`khr_qty_${d}`);
+      if (el) el.addEventListener("input", recalc);
+    }
+    for (const d of USD_DENOMS){
+      const el = document.getElementById(`usd_qty_${d}`);
+      if (el) el.addEventListener("input", recalc);
+    }
+  }
+
+  bindRecalc();
+  recalc();
+</script>
+</body>
+</html>

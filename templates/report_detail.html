@@ -1,0 +1,53 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Report Detail</title>
+  <style>
+    body{font-family:Arial,"Noto Sans Khmer",sans-serif;background:#f6f7fb;margin:0;padding:20px}
+    .wrap{max-width:900px;margin:0 auto}
+    .card{background:#fff;border:1px solid #e6e7ee;border-radius:14px;padding:14px;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border:1px solid #e6e7ee;padding:8px;text-align:right}
+    th{background:#fafbff;text-align:center}
+    td:first-child,th:first-child{text-align:center}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <p><a href="/reports">← Back</a></p>
+
+  <div class="card">
+    <h2>Report #{{ rep.id }}</h2>
+    <div>Time: {{ rep.created_at }}</div>
+    <div>Staff: {{ rep.staff }} | Shift: {{ rep.shift }}</div>
+    <div>Rate: {{ rep.exchange_rate }}</div>
+
+    <div>Cash USD: {{ rep.cash_usd }} | Cash KHR: {{ "{:,}".format(rep.cash_khr) }}</div>
+    <div>Visa$: {{ rep.visa_usd }} | ABA៛: {{ "{:,}".format(rep.aba_khr) }} | AC$: {{ rep.ac_usd }} | AC៛: {{ "{:,}".format(rep.ac_khr) }}</div>
+    <div>Expense: ៛{{ "{:,}".format(rep.expense_khr) }} | ${{ "%.2f"|format(rep.expense_usd) }}</div>
+
+    <div><b>Total KHR (Net):</b> {{ "{:,}".format(rep.total_khr) }} | <b>Total USD (Net):</b> {{ "%.4f"|format(rep.total_usd) }}</div>
+    <div>POS USD: {{ "%.2f"|format(rep.pos_usd) }}</div>
+    <div>Note: {{ rep.note }}</div>
+  </div>
+
+  <div class="card">
+    <h3>Denominations</h3>
+    <table>
+      <thead><tr><th>Currency</th><th>Denom</th><th>Qty</th><th>Subtotal</th></tr></thead>
+      <tbody>
+        {% for d in denoms %}
+        <tr>
+          <td style="text-align:center">{{ d.currency }}</td>
+          <td>{{ d.denom }}</td>
+          <td>{{ d.qty }}</td>
+          <td>{{ d.subtotal }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

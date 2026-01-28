@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Reports</title>
+  <style>
+    body{font-family:Arial,"Noto Sans Khmer",sans-serif;background:#f6f7fb;margin:0;padding:20px}
+    .wrap{max-width:1100px;margin:0 auto}
+    table{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e6e7ee;border-radius:12px;overflow:hidden}
+    th,td{border:1px solid #e6e7ee;padding:10px;text-align:left}
+    th{background:#fafbff}
+    a{color:#1a73e8;text-decoration:none}
+    .flash { padding:10px 12px; border-radius:12px; background:#e8fff0; border:1px solid #b9f0cc; margin-bottom:12px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      {% for m in messages %}
+        <div class="flash">{{ m }}</div>
+      {% endfor %}
+    {% endif %}
+  {% endwith %}
+
+  <h2>Saved Reports</h2>
+  <p><a href="/">← Back</a></p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Time</th><th>Staff</th><th>Shift</th>
+        <th>Rate</th><th>Expense</th><th>Total KHR (Net)</th><th>Total USD (Net)</th><th>Detail</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.id }}</td>
+        <td>{{ r.created_at }}</td>
+        <td>{{ r.staff }}</td>
+        <td>{{ r.shift }}</td>
+        <td>{{ r.exchange_rate }}</td>
+        <td>៛{{ "{:,}".format(r.expense_khr) }} / ${{ "%.2f"|format(r.expense_usd) }}</td>
+        <td>{{ "{:,}".format(r.total_khr) }}</td>
+        <td>{{ "%.4f"|format(r.total_usd) }}</td>
+        <td><a href="/reports/{{ r.id }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+</div>
+</body>
+</html>
